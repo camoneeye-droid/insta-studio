@@ -1,0 +1,2451 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InstaStudio Pro — Crop, Fine-Tune & Carousel Slicer</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Google Fonts: Inter, Playfair Display, Space Grotesk, JetBrains Mono, Caveat -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@0,600;1,600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            serif: ['Playfair Display', 'serif'],
+            script: ['Caveat', 'cursive'],
+            display: ['Space Grotesk', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              400: '#38bdf8',
+              500: '#0ea5e9',
+              600: '#0284c7',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.45);
+    }
+
+    /* Range Sliders */
+    input[type=range] {
+      -webkit-appearance: none;
+      appearance: none;
+      background: transparent;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 9999px;
+      background-color: #27272a;
+    }
+    .dark input[type=range]::-webkit-slider-runnable-track {
+      background-color: #27272a;
+    }
+    html:not(.dark) input[type=range]::-webkit-slider-runnable-track {
+      background-color: #e4e4e7;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 14px;
+      width: 14px;
+      border-radius: 9999px;
+      background: #fafafa;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+      margin-top: -5px;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    html:not(.dark) input[type=range]::-webkit-slider-thumb {
+      background: #18181b;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.25);
+    }
+
+    /* Subtle Canvas Backdrop */
+    .bg-canvas-dots {
+      background-image: radial-gradient(rgba(115, 115, 115, 0.16) 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+    }
+    html:not(.dark) .bg-canvas-dots {
+      background-image: radial-gradient(rgba(115, 115, 115, 0.22) 1.2px, transparent 1.2px);
+    }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans h-screen flex flex-col overflow-hidden antialiased select-none dark:bg-zinc-950 dark:text-zinc-100 transition-colors duration-200">
+
+  <!-- TOP APP BAR -->
+  <header class="h-14 py-2 px-4 border-b border-zinc-800/80 bg-zinc-900/70 backdrop-blur-md flex items-center justify-between shrink-0 z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 p-[1.5px] flex items-center justify-center shadow-md">
+        <div class="w-full h-full bg-zinc-900 rounded-[7px] flex items-center justify-center text-white">
+          <i class="ph-bold ph-crop text-base text-rose-400"></i>
+        </div>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-sm tracking-tight text-white font-display">InstaStudio</span>
+          <span class="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-800 text-sky-400 border border-zinc-700/60 font-semibold">Pro Suite</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode Selector Switch -->
+    <div class="flex items-center bg-zinc-900 border border-zinc-800 rounded-full p-1 shadow-inner text-xs">
+      <button id="btnCropMode" class="flex items-center gap-1.5 px-3.5 py-1 rounded-full font-medium transition-all bg-zinc-800 text-white shadow-sm">
+        <i class="ph ph-bounding-box text-sm"></i>
+        <span>Single Crop</span>
+      </button>
+      <button id="btnCarouselMode" class="flex items-center gap-1.5 px-3.5 py-1 rounded-full font-medium transition-all text-zinc-400 hover:text-zinc-200">
+        <i class="ph ph-slideshow text-sm"></i>
+        <span>Carousel Slicer</span>
+      </button>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="flex items-center gap-2">
+      <!-- Phone & Feed Simulator -->
+      <button id="btnOpenMockup" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900/90 text-zinc-300 text-xs font-medium transition shadow-sm">
+        <i class="ph ph-device-mobile text-sm text-sky-400"></i>
+        <span>Mockup Simulator</span>
+      </button>
+
+      <!-- Light / Dark Mode Toggle -->
+      <button id="btnThemeToggle" title="Toggle Theme" class="p-2 rounded-lg border border-zinc-800 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition">
+        <i class="ph ph-moon text-sm" id="themeIcon"></i>
+      </button>
+
+      <!-- Master Export Trigger -->
+      <button id="btnHeaderExport" class="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold shadow transition active:scale-95">
+        <i class="ph-bold ph-download-simple text-sm"></i>
+        <span id="headerExportText">Export</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <div class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+
+    <!-- CANVAS VIEWPORT -->
+    <main class="flex-1 flex flex-col bg-zinc-950 relative overflow-hidden order-2 md:order-1">
+      
+      <!-- Canvas Utility Toolbar -->
+      <div class="h-10 px-4 border-b border-zinc-800/70 bg-zinc-900/30 flex items-center justify-between text-xs text-zinc-400">
+        <div class="flex items-center gap-2 font-mono text-[11px] overflow-hidden truncate">
+          <span id="canvasDimLabel" class="text-zinc-200 font-semibold">1080 × 1350 px</span>
+          <span class="text-zinc-600">•</span>
+          <span id="ratioTagLabel" class="text-zinc-400">Portrait (4:5)</span>
+          <span id="carouselSlidePill" class="hidden px-2 py-0.5 rounded-full bg-zinc-800 text-sky-400 text-[10px] font-sans border border-sky-900/50 font-semibold">3 Slices</span>
+        </div>
+
+        <!-- Quick Transform & View Tools -->
+        <div class="flex items-center gap-1">
+          <button id="btnToggleGuides" title="Toggle Grid Guides" class="p-1.5 rounded hover:bg-zinc-800 text-sky-400 hover:text-sky-300 transition text-[11px] font-mono flex items-center gap-1">
+            <i class="ph ph-grid-four text-sm"></i> Guides
+          </button>
+          <div class="h-3 w-px bg-zinc-800 mx-1"></div>
+          <button id="btnResetView" title="Reset View" class="px-2 py-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-[11px] font-mono transition">Fit</button>
+          <button id="btnRotateCanvas" title="Rotate 90°" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"><i class="ph ph-arrow-clockwise"></i></button>
+          <button id="btnFlipH" title="Flip Horizontal" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"><i class="ph ph-flip-horizontal"></i></button>
+          <button id="btnFlipV" title="Flip Vertical" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"><i class="ph ph-flip-vertical"></i></button>
+          <div class="h-3 w-px bg-zinc-800 mx-1"></div>
+          <button id="btnZoomOut" title="Zoom Out" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"><i class="ph ph-minus"></i></button>
+          <span id="zoomPercentText" class="font-mono text-[11px] text-zinc-400 w-10 text-center">100%</span>
+          <button id="btnZoomIn" title="Zoom In" class="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition"><i class="ph ph-plus"></i></button>
+        </div>
+      </div>
+
+      <!-- Canvas Stage Center -->
+      <div id="viewportContainer" class="flex-1 bg-canvas-dots relative flex items-center justify-center p-4 sm:p-8 overflow-hidden cursor-grab active:cursor-grabbing">
+
+        <div id="stageWrapper" class="relative transition-transform duration-75 shadow-2xl flex items-center justify-center">
+          <canvas id="mainCanvas" class="block rounded shadow-2xl shadow-black ring-1 ring-zinc-800/80"></canvas>
+          <div id="canvasOverlay" class="pointer-events-none absolute inset-0"></div>
+        </div>
+
+        <!-- Floating Quick Status -->
+        <div class="absolute bottom-3 left-3 bg-zinc-900/80 backdrop-blur border border-zinc-800/80 text-[10px] text-zinc-400 px-3 py-1 rounded-full flex items-center gap-2 pointer-events-none shadow">
+          <i class="ph ph-hand-pointing text-sky-400"></i>
+          <span>Drag to pan &bull; Wheel to zoom &bull; Real-time studio render</span>
+        </div>
+
+        <!-- Drag-and-drop Image Upload Zone -->
+        <div id="emptyDropzone" class="absolute inset-4 sm:inset-12 max-w-lg mx-auto my-auto h-72 border border-dashed border-zinc-700 hover:border-zinc-500 rounded-2xl bg-zinc-900/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center transition cursor-pointer z-10 shadow-2xl">
+          <div class="w-12 h-12 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-300 mb-3 shadow-inner">
+            <i class="ph ph-cloud-arrow-up text-2xl text-sky-400"></i>
+          </div>
+          <h3 class="text-sm font-semibold text-white mb-1">Upload Photo or Panorama</h3>
+          <p class="text-xs text-zinc-400 max-w-xs mb-4">Drag and drop any image, or load a scenic high-resolution panoramic demo</p>
+          <div class="flex items-center gap-2">
+            <label class="cursor-pointer px-4 py-2 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 text-xs font-semibold transition shadow">
+              Browse File
+              <input type="file" id="fileInput" accept="image/*" class="hidden">
+            </label>
+            <button id="btnLoadSampleImage" class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 text-xs font-medium transition">
+              Load Panorama Demo
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOTTOM DOCK: EXTENDED RATIOS (Single Crop Mode) -->
+      <div id="quickCropDock" class="h-14 border-t border-zinc-800/70 bg-zinc-900/50 backdrop-blur px-3 flex items-center gap-2 overflow-x-auto shrink-0">
+        <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest pl-1 pr-1 shrink-0">Ratios</span>
+
+        <button data-ratio="4:5" class="ratio-pill active px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-100 text-zinc-950 border-zinc-200">
+          <i class="ph ph-rectangle-vertical"></i>
+          <span>Portrait 4:5</span>
+          <span class="text-[9px] opacity-75 font-mono">1080×1350</span>
+        </button>
+
+        <button data-ratio="1:1" class="ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+          <i class="ph ph-square"></i>
+          <span>Square 1:1</span>
+          <span class="text-[9px] text-zinc-500 font-mono">1080×1080</span>
+        </button>
+
+        <button data-ratio="9:16" class="ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+          <i class="ph ph-device-mobile"></i>
+          <span>Story 9:16</span>
+          <span class="text-[9px] text-zinc-500 font-mono">1080×1920</span>
+        </button>
+
+        <button data-ratio="1.91:1" class="ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+          <i class="ph ph-rectangle"></i>
+          <span>IG Landscape 1.91:1</span>
+          <span class="text-[9px] text-zinc-500 font-mono">1080×566</span>
+        </button>
+
+        <button data-ratio="16:9" class="ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+          <i class="ph ph-monitor"></i>
+          <span>Wide 16:9</span>
+          <span class="text-[9px] text-zinc-500 font-mono">1920×1080</span>
+        </button>
+
+        <button data-ratio="4:3" class="ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+          <i class="ph ph-frame-corners"></i>
+          <span>Classic 4:3</span>
+          <span class="text-[9px] text-zinc-500 font-mono">1440×1080</span>
+        </button>
+
+        <button data-ratio="2:3" class="ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+          <i class="ph ph-film-strip"></i>
+          <span>35mm 2:3</span>
+          <span class="text-[9px] text-zinc-500 font-mono">1080×1620</span>
+        </button>
+
+        <button data-ratio="circle" class="ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+          <i class="ph ph-circle"></i>
+          <span>Avatar Circle</span>
+          <span class="text-[9px] text-zinc-500 font-mono">1080×1080</span>
+        </button>
+      </div>
+
+      <!-- BOTTOM DOCK: CAROUSEL SLICES (Carousel Mode) -->
+      <div id="quickCarouselDock" class="hidden h-14 border-t border-zinc-800/70 bg-zinc-900/50 backdrop-blur px-4 flex items-center justify-between gap-4 overflow-x-auto shrink-0">
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-widest pl-1 pr-1 shrink-0">Slices</span>
+          <div class="flex items-center bg-zinc-900 p-0.5 rounded-lg border border-zinc-800">
+            <button data-slices="2" class="slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition">2</button>
+            <button data-slices="3" class="slice-btn active px-2.5 py-1 rounded text-xs font-semibold bg-zinc-800 text-white shadow-sm transition">3</button>
+            <button data-slices="4" class="slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition">4</button>
+            <button data-slices="5" class="slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition">5</button>
+            <button data-slices="6" class="slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition">6</button>
+            <button data-slices="7" class="slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition">7</button>
+            <button data-slices="8" class="slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition">8</button>
+            <button data-slices="10" class="slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition">10</button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 shrink-0">
+          <button id="btnQuickSwipeLaunch" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-medium shadow-sm transition">
+            <i class="ph ph-hand-swipe-left text-sm text-sky-400"></i>
+            <span>Test Swiper</span>
+          </button>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- RIGHT INSPECTOR CONTROLS PANEL -->
+    <aside class="w-full md:w-80 lg:w-92 border-t md:border-t-0 md:border-l border-zinc-800/80 bg-zinc-900/60 backdrop-blur-xl flex flex-col order-1 md:order-2 shrink-0 overflow-y-auto">
+      
+      <!-- Panel Navigation Tabs -->
+      <div class="flex border-b border-zinc-800 bg-zinc-900/90 sticky top-0 z-10 text-xs">
+        <button data-tab="tab-frame" class="panel-tab active flex-1 py-3 font-medium text-white border-b-2 border-white transition flex justify-center items-center gap-1">
+          <i class="ph ph-sliders"></i> Frame
+        </button>
+        <button data-tab="tab-tune" class="panel-tab flex-1 py-3 font-medium text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent transition flex justify-center items-center gap-1">
+          <i class="ph ph-faders"></i> Adjust
+        </button>
+        <button data-tab="tab-filters" class="panel-tab flex-1 py-3 font-medium text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent transition flex justify-center items-center gap-1">
+          <i class="ph ph-sparkle"></i> Filters
+        </button>
+        <button data-tab="tab-text" class="panel-tab flex-1 py-3 font-medium text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent transition flex justify-center items-center gap-1">
+          <i class="ph ph-text-t"></i> Text
+        </button>
+      </div>
+
+      <!-- Tab Bodies -->
+      <div class="p-4 space-y-6 flex-1 text-xs">
+
+        <!-- TAB 1: FRAME & CAROUSEL SETUP -->
+        <div id="tab-frame" class="tab-content space-y-5">
+          
+          <!-- Carousel Specific Setup -->
+          <div id="carouselControlCard" class="hidden rounded-xl border border-zinc-800 bg-zinc-900/80 p-3.5 space-y-3 shadow-sm">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
+                <i class="ph ph-columns text-sm text-sky-400"></i> Seamless Slices
+              </span>
+              <span id="cardSliceCount" class="text-[11px] font-mono px-2 py-0.5 rounded bg-zinc-800 text-sky-400 border border-zinc-700">3 Slides</span>
+            </div>
+
+            <div class="space-y-1">
+              <label class="text-[11px] text-zinc-400">Individual Slide Ratio</label>
+              <div class="grid grid-cols-2 gap-1.5">
+                <button id="btnSliceRatioPortrait" class="py-1.5 px-2 rounded-lg text-xs font-medium border border-zinc-600 bg-zinc-800 text-white transition">
+                  Portrait 4:5
+                </button>
+                <button id="btnSliceRatioSquare" class="py-1.5 px-2 rounded-lg text-xs font-medium border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white transition">
+                  Square 1:1
+                </button>
+              </div>
+            </div>
+
+            <div class="space-y-1 pt-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-zinc-400">Total Slices</span>
+                <span id="labelSlideCount" class="font-mono text-zinc-200">3</span>
+              </div>
+              <input type="range" id="inputSliceCount" min="2" max="10" value="3" class="w-full">
+            </div>
+          </div>
+
+          <!-- Fit vs Fill Options -->
+          <div class="space-y-2">
+            <label class="text-[11px] font-mono text-zinc-500 uppercase tracking-widest block">Fit Strategy</label>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btnFitModeFill" class="py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition bg-zinc-100 text-zinc-900 border-zinc-200 font-semibold shadow-sm">
+                <i class="ph ph-arrows-out-simple"></i> Crop & Fill
+              </button>
+              <button id="btnFitModeFit" class="py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800">
+                <i class="ph ph-arrows-in-simple"></i> Fit & Frame
+              </button>
+            </div>
+          </div>
+
+          <!-- Framing & Border Styles -->
+          <div class="space-y-3 pt-3 border-t border-zinc-800/80">
+            <label class="text-[11px] font-mono text-zinc-500 uppercase tracking-widest block">Framing & Borders</label>
+
+            <!-- Frame style pills -->
+            <div class="grid grid-cols-3 gap-1.5">
+              <button data-border="none" class="border-style-pill active py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-800 text-white border-zinc-600">None</button>
+              <button data-border="passepartout" class="border-style-pill py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-900 text-zinc-400 border-zinc-800">Gallery</button>
+              <button data-border="polaroid" class="border-style-pill py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-900 text-zinc-400 border-zinc-800">Polaroid</button>
+            </div>
+
+            <!-- Frame border width slider -->
+            <div id="borderWidthRow" class="hidden space-y-1 pt-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-zinc-400">Border Thickness</span>
+                <span id="labelBorderWidth" class="font-mono text-zinc-300">40px</span>
+              </div>
+              <input type="range" id="inputBorderWidth" min="10" max="140" value="40" class="w-full">
+            </div>
+
+            <!-- Frame border color picker -->
+            <div id="borderColorRow" class="hidden flex items-center justify-between pt-1">
+              <span class="text-zinc-400">Border Color</span>
+              <div class="flex items-center gap-2">
+                <button data-bcolor="#ffffff" class="w-5 h-5 rounded-full bg-white border border-zinc-400 ring-1 ring-zinc-700"></button>
+                <button data-bcolor="#000000" class="w-5 h-5 rounded-full bg-black border border-zinc-700"></button>
+                <button data-bcolor="#f5f5f4" class="w-5 h-5 rounded-full bg-stone-100 border border-zinc-400"></button>
+                <button data-bcolor="#18181b" class="w-5 h-5 rounded-full bg-zinc-900 border border-zinc-700"></button>
+                <input type="color" id="inputCustomBorderColor" value="#ffffff" class="w-6 h-6 rounded-full cursor-pointer bg-transparent border-0" title="Custom color">
+              </div>
+            </div>
+          </div>
+
+          <!-- Canvas Background (Active when in Fit mode) -->
+          <div id="fitBackgroundOptions" class="hidden space-y-3 pt-3 border-t border-zinc-800/80">
+            <label class="text-[11px] font-mono text-zinc-500 uppercase tracking-widest block">Fit Canvas Background</label>
+
+            <div class="grid grid-cols-3 gap-1.5">
+              <button data-bg="blur" class="bg-style-pill active py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-800 text-white border-zinc-600">Blur</button>
+              <button data-bg="solid" class="bg-style-pill py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-900 text-zinc-400 border-zinc-800">Solid</button>
+              <button data-bg="gradient" class="bg-style-pill py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-900 text-zinc-400 border-zinc-800">Gradient</button>
+            </div>
+
+            <div id="solidColorPickerRow" class="hidden flex items-center gap-2 pt-1 flex-wrap">
+              <button data-c="#ffffff" class="w-6 h-6 rounded-full bg-white border border-zinc-300"></button>
+              <button data-c="#000000" class="w-6 h-6 rounded-full bg-black border border-zinc-700"></button>
+              <button data-c="#18181b" class="w-6 h-6 rounded-full bg-zinc-900 border border-zinc-700"></button>
+              <button data-c="#f4f4f5" class="w-6 h-6 rounded-full bg-zinc-100 border border-zinc-300"></button>
+              <button data-c="#fce7f3" class="w-6 h-6 rounded-full bg-pink-100 border border-pink-200"></button>
+              <button data-c="#e0f2fe" class="w-6 h-6 rounded-full bg-sky-100 border border-sky-200"></button>
+              <input type="color" id="inputCustomColor" value="#ffffff" class="w-6 h-6 rounded-full cursor-pointer bg-transparent border-0" title="Custom color">
+            </div>
+
+            <div id="gradientPickerRow" class="hidden grid grid-cols-4 gap-1.5 pt-1">
+              <button data-g="instagram" class="h-6 rounded-md bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 ring-1 ring-white/10" title="Sunset"></button>
+              <button data-g="ocean" class="h-6 rounded-md bg-gradient-to-tr from-blue-600 to-emerald-400 ring-1 ring-white/10" title="Ocean"></button>
+              <button data-g="mono" class="h-6 rounded-md bg-gradient-to-b from-zinc-700 to-zinc-950 ring-1 ring-white/10" title="Charcoal"></button>
+              <button data-g="twilight" class="h-6 rounded-md bg-gradient-to-tr from-indigo-700 to-rose-400 ring-1 ring-white/10" title="Twilight"></button>
+            </div>
+
+            <!-- Margin Padding Slider -->
+            <div class="space-y-1 pt-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-zinc-400">Padding Margin</span>
+                <span id="labelPadding" class="font-mono text-zinc-300">0%</span>
+              </div>
+              <input type="range" id="inputPadding" min="0" max="25" value="0" class="w-full">
+            </div>
+
+            <!-- Blur radius -->
+            <div id="blurSliderRow" class="space-y-1 pt-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-zinc-400">Background Blur</span>
+                <span id="labelBlur" class="font-mono text-zinc-300">30px</span>
+              </div>
+              <input type="range" id="inputBlurRadius" min="5" max="70" value="30" class="w-full">
+            </div>
+          </div>
+
+          <!-- Image Scale Slider -->
+          <div class="space-y-1.5 pt-3 border-t border-zinc-800/80">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Manual Scale</span>
+              <span id="labelScale" class="font-mono text-zinc-300">100%</span>
+            </div>
+            <input type="range" id="inputScale" min="30" max="350" value="100" class="w-full">
+          </div>
+        </div>
+
+        <!-- TAB 2: PRO ADJUSTMENTS & COLOR GRADING -->
+        <div id="tab-tune" class="tab-content hidden space-y-4">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[11px] font-mono text-zinc-500 uppercase tracking-widest">Fine Tuning</span>
+            <button id="btnResetAdjust" class="text-xs text-sky-400 hover:text-sky-300 transition">Reset All</button>
+          </div>
+
+          <!-- Exposure / Brightness -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Exposure</span>
+              <span id="valBrightness" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjBrightness" min="-100" max="100" value="0" class="w-full">
+          </div>
+
+          <!-- Contrast -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Contrast</span>
+              <span id="valContrast" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjContrast" min="-100" max="100" value="0" class="w-full">
+          </div>
+
+          <!-- Saturation -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Saturation</span>
+              <span id="valSaturation" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjSaturation" min="-100" max="100" value="0" class="w-full">
+          </div>
+
+          <!-- Temperature / Warmth -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Temperature (Cool/Warm)</span>
+              <span id="valWarmth" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjWarmth" min="-50" max="50" value="0" class="w-full">
+          </div>
+
+          <!-- Tint (Green / Magenta) -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Tint (Green/Magenta)</span>
+              <span id="valTint" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjTint" min="-50" max="50" value="0" class="w-full">
+          </div>
+
+          <!-- Highlights Recovery -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Highlights</span>
+              <span id="valHighlights" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjHighlights" min="-50" max="50" value="0" class="w-full">
+          </div>
+
+          <!-- Shadows Recovery -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Shadows</span>
+              <span id="valShadows" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjShadows" min="-50" max="50" value="0" class="w-full">
+          </div>
+
+          <!-- Clarity & Sharpening -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Sharpness / Clarity</span>
+              <span id="valSharpness" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjSharpness" min="0" max="100" value="0" class="w-full">
+          </div>
+
+          <!-- Authentic Film Grain -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Film Grain Intensity</span>
+              <span id="valGrain" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjGrain" min="0" max="100" value="0" class="w-full">
+          </div>
+
+          <!-- Vignette -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Vignette</span>
+              <span id="valVignette" class="font-mono text-zinc-300">0%</span>
+            </div>
+            <input type="range" id="adjVignette" min="0" max="100" value="0" class="w-full">
+          </div>
+
+          <!-- Soft Focus Blur -->
+          <div class="space-y-1">
+            <div class="flex justify-between text-xs">
+              <span class="text-zinc-400">Soft Focus Blur</span>
+              <span id="valSoftBlur" class="font-mono text-zinc-300">0px</span>
+            </div>
+            <input type="range" id="adjSoftBlur" min="0" max="10" value="0" class="w-full">
+          </div>
+        </div>
+
+        <!-- TAB 3: PRO FILTER PRESETS -->
+        <div id="tab-filters" class="tab-content hidden space-y-3">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[11px] font-mono text-zinc-500 uppercase tracking-widest">Filter Presets</span>
+            <button id="btnResetFilters" class="text-xs text-sky-400 hover:text-sky-300 transition">Natural / Reset</button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button data-filter="normal" class="filter-btn active text-left p-2.5 rounded-lg border border-zinc-500 bg-zinc-800 transition">
+              <div class="text-xs font-semibold text-white">Natural</div>
+              <div class="text-[10px] text-zinc-400">Original balance</div>
+            </button>
+            <button data-filter="clarendon" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Clarendon</div>
+              <div class="text-[10px] text-zinc-400">Punchy highlights</div>
+            </button>
+            <button data-filter="lark" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Lark</div>
+              <div class="text-[10px] text-zinc-400">Clean & vibrant</div>
+            </button>
+            <button data-filter="juno" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Juno</div>
+              <div class="text-[10px] text-zinc-400">Rich warm tones</div>
+            </button>
+            <button data-filter="portra" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Kodak Portra</div>
+              <div class="text-[10px] text-zinc-400">Analog warmth & grain</div>
+            </button>
+            <button data-filter="hp5" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Ilford HP5 B&W</div>
+              <div class="text-[10px] text-zinc-400">Deep monochrome</div>
+            </button>
+            <button data-filter="golden" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Golden Hour</div>
+              <div class="text-[10px] text-zinc-400">Luminous sunset</div>
+            </button>
+            <button data-filter="tealorange" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Teal & Orange</div>
+              <div class="text-[10px] text-zinc-400">Cinematic color grade</div>
+            </button>
+            <button data-filter="matte" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Moody Matte</div>
+              <div class="text-[10px] text-zinc-400">Faded black finish</div>
+            </button>
+            <button data-filter="cyberpunk" class="filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition">
+              <div class="text-xs font-semibold text-white">Cyber Neon</div>
+              <div class="text-[10px] text-zinc-400">Futuristic glow</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB 4: TEXT & WATERMARK OVERLAY -->
+        <div id="tab-text" class="tab-content hidden space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-mono text-zinc-500 uppercase tracking-widest">Creator Overlay</span>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="checkEnableWatermark" class="rounded bg-zinc-800 border-zinc-700 text-sky-500 focus:ring-0">
+              <span class="text-xs text-zinc-300">Enable</span>
+            </label>
+          </div>
+
+          <div id="watermarkControlsContainer" class="opacity-40 pointer-events-none transition-opacity space-y-3">
+            <!-- Text Content -->
+            <div class="space-y-1">
+              <label class="text-[11px] text-zinc-400">Watermark / Handle</label>
+              <input type="text" id="inputWatermarkText" value="@your.lens" placeholder="e.g. @your_handle" class="w-full px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-xs focus:outline-none focus:border-zinc-500">
+            </div>
+
+            <!-- Font Family -->
+            <div class="space-y-1">
+              <label class="text-[11px] text-zinc-400">Font Style</label>
+              <select id="selectWatermarkFont" class="w-full px-2.5 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white text-xs focus:outline-none">
+                <option value="Inter">Modern Sans (Inter)</option>
+                <option value="'Playfair Display', serif">Editorial Serif (Playfair)</option>
+                <option value="'JetBrains Mono', monospace">Tech Monospace</option>
+                <option value="'Caveat', cursive">Signature Script</option>
+              </select>
+            </div>
+
+            <!-- Position Picker -->
+            <div class="space-y-1">
+              <label class="text-[11px] text-zinc-400">Position</label>
+              <div class="grid grid-cols-3 gap-1">
+                <button data-wpos="top-left" class="wpos-btn py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 hover:bg-zinc-700 transition">Top Left</button>
+                <button data-wpos="top-center" class="wpos-btn py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 hover:bg-zinc-700 transition">Top Ctr</button>
+                <button data-wpos="top-right" class="wpos-btn py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 hover:bg-zinc-700 transition">Top Right</button>
+                <button data-wpos="bottom-left" class="wpos-btn py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 hover:bg-zinc-700 transition">Btm Left</button>
+                <button data-wpos="bottom-center" class="wpos-btn py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 hover:bg-zinc-700 transition">Btm Ctr</button>
+                <button data-wpos="bottom-right" class="wpos-btn active py-1 rounded bg-zinc-100 text-zinc-950 font-bold text-[10px] transition">Btm Right</button>
+              </div>
+            </div>
+
+            <!-- Font Size & Opacity -->
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-zinc-400">Text Size</span>
+                <span id="valWatermarkSize" class="font-mono text-zinc-300">28px</span>
+              </div>
+              <input type="range" id="inputWatermarkSize" min="14" max="72" value="28" class="w-full">
+            </div>
+
+            <div class="space-y-1">
+              <div class="flex justify-between text-xs">
+                <span class="text-zinc-400">Opacity</span>
+                <span id="valWatermarkOpacity" class="font-mono text-zinc-300">85%</span>
+              </div>
+              <input type="range" id="inputWatermarkOpacity" min="10" max="100" value="85" class="w-full">
+            </div>
+
+            <!-- Pill Badge Background Toggle & Color -->
+            <div class="pt-2 flex items-center justify-between border-t border-zinc-800">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="checkWatermarkBadge" class="rounded bg-zinc-800 border-zinc-700 text-sky-500">
+                <span class="text-xs text-zinc-300">Badge Pill Backdrop</span>
+              </label>
+              <div class="flex items-center gap-2">
+                <button data-wcolor="#ffffff" class="w-5 h-5 rounded-full bg-white border border-zinc-300 ring-1 ring-zinc-700" title="White text"></button>
+                <button data-wcolor="#000000" class="w-5 h-5 rounded-full bg-black border border-zinc-600" title="Dark text"></button>
+                <input type="color" id="inputWatermarkCustomColor" value="#ffffff" class="w-5 h-5 rounded-full cursor-pointer bg-transparent border-0" title="Custom color">
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- EXPORT CONTROL FOOTER (Sidebar Bottom) -->
+      <div class="p-4 border-t border-zinc-800/80 bg-zinc-900/80 space-y-3 shrink-0">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-zinc-400">Format</span>
+          <div class="flex items-center bg-zinc-800 p-0.5 rounded-md border border-zinc-700/60">
+            <button id="btnFormatJpg" class="px-2.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 transition">JPG</button>
+            <button id="btnFormatPng" class="px-2.5 py-0.5 rounded text-xs font-medium text-zinc-400 hover:text-white transition">PNG</button>
+          </div>
+        </div>
+
+        <!-- Resolution Scaling (1x vs 2x Retina) -->
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-zinc-400">Resolution</span>
+          <div class="flex items-center bg-zinc-800 p-0.5 rounded-md border border-zinc-700/60">
+            <button id="btnScale1x" class="px-2.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 transition">1x (Standard)</button>
+            <button id="btnScale2x" class="px-2.5 py-0.5 rounded text-xs font-medium text-zinc-400 hover:text-white transition">2x (Ultra HD)</button>
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs">
+            <span class="text-zinc-400">Compression Quality</span>
+            <span id="labelQuality" class="font-mono text-zinc-300">95%</span>
+          </div>
+          <input type="range" id="inputQuality" min="65" max="100" value="95" class="w-full">
+        </div>
+
+        <button id="btnSidebarExport" class="w-full py-2.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs transition shadow active:scale-[0.98] flex items-center justify-center gap-1.5">
+          <i class="ph-bold ph-download-simple"></i>
+          <span id="sidebarExportText">Download Ready Photo</span>
+        </button>
+
+        <!-- Carousel Individual Slices Chips -->
+        <div id="carouselIndividualDownloads" class="hidden space-y-1.5 pt-2 border-t border-zinc-800/80">
+          <span class="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block">Direct Slide Downloads</span>
+          <div id="sliceChipsContainer" class="flex flex-wrap gap-1"></div>
+        </div>
+      </div>
+
+    </aside>
+  </div>
+
+  <!-- SIMULATOR MODAL: CAROUSEL SWIPER, FEED & 3x3 GRID -->
+  <div id="mockupModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md hidden flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full overflow-hidden shadow-2xl flex flex-col max-h-[92vh]">
+      
+      <!-- Modal Top bar -->
+      <div class="px-4 py-3 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/90">
+        <div class="flex items-center bg-zinc-800 p-0.5 rounded-lg border border-zinc-700/60 text-xs">
+          <button id="modalTabSwiper" class="px-3 py-1 rounded-md bg-zinc-700 text-white font-medium transition flex items-center gap-1">
+            <i class="ph ph-hand-swipe-left"></i> Swiper
+          </button>
+          <button id="modalTabFeed" class="px-3 py-1 rounded-md text-zinc-400 hover:text-white font-medium transition">
+            Feed
+          </button>
+          <button id="modalTabGrid" class="px-3 py-1 rounded-md text-zinc-400 hover:text-white font-medium transition">
+            3x3 Grid
+          </button>
+        </div>
+        <button id="btnCloseModal" class="p-1 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-white transition">
+          <i class="ph-bold ph-x text-base"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-4 overflow-y-auto flex-1 flex flex-col items-center justify-center bg-zinc-950">
+        
+        <!-- 1. SWIPABLE PHONE CAROUSEL SIMULATOR -->
+        <div id="viewSwiperSim" class="w-full max-w-[340px] bg-black border border-zinc-800 rounded-[2.5rem] p-3 shadow-2xl ring-1 ring-white/10 relative">
+          <!-- Dynamic Island Notch -->
+          <div class="w-24 h-4 bg-zinc-900 rounded-full mx-auto mb-2 flex items-center justify-center">
+            <div class="w-2.5 h-2.5 rounded-full bg-zinc-950 mr-2"></div>
+            <div class="w-1.5 h-1.5 rounded-full bg-blue-950"></div>
+          </div>
+
+          <!-- Phone Post Shell -->
+          <div class="rounded-2xl overflow-hidden bg-black border border-zinc-900">
+            <!-- Header -->
+            <div class="p-2.5 flex items-center justify-between border-b border-zinc-900">
+              <div class="flex items-center gap-2">
+                <div class="w-6 h-6 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 p-[1px]">
+                  <div class="w-full h-full rounded-full bg-black flex items-center justify-center text-[10px] text-zinc-300 font-bold">IG</div>
+                </div>
+                <span class="text-xs font-semibold text-white">seamless_story</span>
+              </div>
+              <span id="swiperSlideCounter" class="text-[10px] font-mono bg-zinc-900 text-zinc-300 px-2 py-0.5 rounded-full border border-zinc-800">1/3</span>
+            </div>
+
+            <!-- Swiper Stage Container -->
+            <div class="relative w-full overflow-hidden bg-zinc-950 aspect-[4/5] flex items-center justify-center">
+              <div id="swiperTrack" class="flex transition-transform duration-300 ease-out h-full w-full select-none">
+                <!-- Slices inserted dynamically -->
+              </div>
+
+              <!-- Prev / Next Overlays -->
+              <button id="btnSwiperPrev" class="absolute left-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center border border-white/10 transition shadow">
+                <i class="ph-bold ph-caret-left"></i>
+              </button>
+              <button id="btnSwiperNext" class="absolute right-2 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-black/60 hover:bg-black text-white flex items-center justify-center border border-white/10 transition shadow">
+                <i class="ph-bold ph-caret-right"></i>
+              </button>
+            </div>
+
+            <!-- Dots -->
+            <div id="swiperDots" class="h-6 flex items-center justify-center gap-1.5 bg-black">
+              <!-- Dots dynamically populated -->
+            </div>
+
+            <!-- Post Meta -->
+            <div class="p-2.5 space-y-1.5 text-xs bg-black">
+              <div class="flex items-center justify-between text-white text-base">
+                <div class="flex gap-3">
+                  <i class="ph ph-heart hover:text-red-500 cursor-pointer"></i>
+                  <i class="ph ph-chat-circle"></i>
+                  <i class="ph ph-paper-plane-tilt"></i>
+                </div>
+                <i class="ph ph-bookmark"></i>
+              </div>
+              <div class="text-[11px] text-zinc-300">
+                <span class="font-semibold text-white mr-1">seamless_story</span>Swipe across to view the uninterrupted panoramic slice.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. STATIC FEED POST PREVIEW -->
+        <div id="viewFeedSim" class="w-full max-w-[340px] bg-black border border-zinc-800 rounded-2xl overflow-hidden shadow-2xl hidden">
+          <div class="p-3 flex items-center justify-between border-b border-zinc-900">
+            <div class="flex items-center gap-2">
+              <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 p-[1.5px]">
+                <div class="w-full h-full rounded-full bg-black flex items-center justify-center text-[10px] font-bold text-white">P</div>
+              </div>
+              <span class="text-xs font-semibold text-white">feed_preview</span>
+            </div>
+            <i class="ph ph-dots-three text-zinc-400 text-lg"></i>
+          </div>
+          <div class="w-full bg-zinc-950 flex items-center justify-center">
+            <img id="imgFeedPreview" src="" alt="Feed Post" class="w-full object-contain max-h-[440px]">
+          </div>
+          <div class="p-3 text-xs space-y-1 bg-black">
+            <div class="flex justify-between text-base text-white">
+              <div class="flex gap-3">
+                <i class="ph ph-heart"></i>
+                <i class="ph ph-chat-circle"></i>
+                <i class="ph ph-paper-plane-tilt"></i>
+              </div>
+              <i class="ph ph-bookmark"></i>
+            </div>
+            <div class="text-[11px] text-zinc-400 pt-1">Single feed post ratio visualizer</div>
+          </div>
+        </div>
+
+        <!-- 3. PROFILE GRID PREVIEW (3x3) -->
+        <div id="viewGridSim" class="w-full max-w-[340px] bg-black border border-zinc-800 rounded-2xl p-3 shadow-2xl hidden space-y-3">
+          <div class="flex items-center gap-3">
+            <div class="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 p-[2px] shrink-0">
+              <div class="w-full h-full rounded-full bg-black overflow-hidden flex items-center justify-center">
+                <img id="imgGridAvatar" src="" class="w-full h-full object-cover hidden">
+                <i id="iconGridAvatarDefault" class="ph ph-user text-zinc-500 text-xl"></i>
+              </div>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-white">your_portfolio</div>
+              <div class="text-[11px] text-zinc-400 mt-0.5">3×3 Grid Aesthetic Simulator</div>
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-1 aspect-square w-full">
+            <div class="aspect-square bg-zinc-900 overflow-hidden relative">
+              <img id="imgGridMain" src="" class="w-full h-full object-cover">
+            </div>
+            <div class="aspect-square bg-zinc-900/60"></div>
+            <div class="aspect-square bg-zinc-900/40"></div>
+            <div class="aspect-square bg-zinc-900/50"></div>
+            <div class="aspect-square bg-zinc-900/70"></div>
+            <div class="aspect-square bg-zinc-900/30"></div>
+            <div class="aspect-square bg-zinc-900/60"></div>
+            <div class="aspect-square bg-zinc-900/40"></div>
+            <div class="aspect-square bg-zinc-900/80"></div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-4 py-2.5 border-t border-zinc-800 bg-zinc-900/80 flex items-center justify-between text-xs text-zinc-400">
+        <span class="text-[11px]">Real-time Instagram Layout Render</span>
+        <button id="btnDismissModal" class="px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs transition">Done</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toast" class="fixed bottom-4 right-4 z-50 bg-zinc-900 border border-zinc-700 text-white text-xs px-3.5 py-2 rounded-xl shadow-xl flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <i class="ph-bold ph-check text-emerald-400" id="toastIcon"></i>
+    <span id="toastMsg">Ready</span>
+  </div>
+
+  <!-- JAVASCRIPT APPLICATION CORE -->
+  <script>
+    // Studio State
+    const state = {
+      image: null,
+      imageLoaded: false,
+      mode: 'crop', // 'crop' | 'carousel'
+      
+      // Dimensions & Aspect Ratio
+      targetW: 1080,
+      targetH: 1350,
+      ratioKey: '4:5',
+      isCircle: false,
+      
+      // Carousel Options
+      carouselSlices: 3,
+      carouselRatio: '4:5', // '4:5' | '1:1'
+      showGuides: true,
+      
+      // Framing & Borders
+      fitMode: 'fill', // 'fill' | 'fit'
+      borderStyle: 'none', // 'none' | 'passepartout' | 'polaroid'
+      borderWidth: 40,
+      borderColor: '#ffffff',
+      bgStyle: 'blur', // 'blur' | 'solid' | 'gradient'
+      solidColor: '#ffffff',
+      gradientName: 'instagram',
+      paddingPercent: 0,
+      bgBlur: 30,
+
+      // Transform Controls
+      scaleMultiplier: 1.0,
+      panX: 0,
+      panY: 0,
+      rotation: 0,
+      flipH: false,
+      flipV: false,
+
+      // Fine-Tuning & Color Grading
+      brightness: 0,    // -100 to 100
+      contrast: 0,      // -100 to 100
+      saturation: 0,    // -100 to 100
+      warmth: 0,        // -50 to 50 (Cool to Warm)
+      tint: 0,          // -50 to 50 (Green to Magenta)
+      highlights: 0,    // -50 to 50
+      shadows: 0,       // -50 to 50
+      sharpness: 0,     // 0 to 100
+      grain: 0,         // 0 to 100
+      vignette: 0,      // 0 to 100
+      softBlur: 0,      // 0 to 10 px
+      filter: 'normal', // preset filter
+
+      // Watermark / Text
+      watermarkEnabled: false,
+      watermarkText: '@your.lens',
+      watermarkFont: 'Inter',
+      watermarkPosition: 'bottom-right',
+      watermarkSize: 28,
+      watermarkOpacity: 85,
+      watermarkColor: '#ffffff',
+      watermarkBadge: false,
+
+      // Export
+      exportMime: 'image/jpeg',
+      exportQuality: 0.95,
+      exportScale: 1, // 1 or 2
+
+      // Viewport Navigation
+      viewportZoom: 1.0,
+      isDragging: false,
+      dragStartX: 0,
+      dragStartY: 0,
+      swiperIndex: 0
+    };
+
+    // DOM Elements
+    const mainCanvas = document.getElementById('mainCanvas');
+    const ctx = mainCanvas.getContext('2d');
+    const stageWrapper = document.getElementById('stageWrapper');
+    const canvasOverlay = document.getElementById('canvasOverlay');
+    const viewportContainer = document.getElementById('viewportContainer');
+    const emptyDropzone = document.getElementById('emptyDropzone');
+    const fileInput = document.getElementById('fileInput');
+
+    const canvasDimLabel = document.getElementById('canvasDimLabel');
+    const ratioTagLabel = document.getElementById('ratioTagLabel');
+    const carouselSlidePill = document.getElementById('carouselSlidePill');
+    const zoomPercentText = document.getElementById('zoomPercentText');
+    const headerExportText = document.getElementById('headerExportText');
+    const sidebarExportText = document.getElementById('sidebarExportText');
+
+    const quickCropDock = document.getElementById('quickCropDock');
+    const quickCarouselDock = document.getElementById('quickCarouselDock');
+    const carouselControlCard = document.getElementById('carouselControlCard');
+    const fitBackgroundOptions = document.getElementById('fitBackgroundOptions');
+    const carouselIndividualDownloads = document.getElementById('carouselIndividualDownloads');
+    const sliceChipsContainer = document.getElementById('sliceChipsContainer');
+
+    // Toast Messenger
+    function showToast(text, isError = false) {
+      const toast = document.getElementById('toast');
+      const toastMsg = document.getElementById('toastMsg');
+      const toastIcon = document.getElementById('toastIcon');
+
+      toastMsg.innerText = text;
+      toastIcon.className = isError ? 'ph-bold ph-warning text-rose-400' : 'ph-bold ph-check text-emerald-400';
+
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }, 2600);
+    }
+
+    // Theme Toggle
+    const btnThemeToggle = document.getElementById('btnThemeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    btnThemeToggle.addEventListener('click', () => {
+      const isDark = document.documentElement.classList.toggle('dark');
+      themeIcon.className = isDark ? 'ph ph-moon text-sm' : 'ph ph-sun text-sm';
+      showToast(isDark ? 'Dark mode activated' : 'Light mode activated');
+      render();
+    });
+
+    // Toggle Grid Guides
+    const btnToggleGuides = document.getElementById('btnToggleGuides');
+    btnToggleGuides.addEventListener('click', () => {
+      state.showGuides = !state.showGuides;
+      btnToggleGuides.classList.toggle('text-sky-400', state.showGuides);
+      btnToggleGuides.classList.toggle('text-zinc-500', !state.showGuides);
+      updateOverlays();
+      showToast(state.showGuides ? 'Guides enabled' : 'Guides hidden');
+    });
+
+    // Mode Switching: Single Crop vs Carousel Slicer
+    const btnCropMode = document.getElementById('btnCropMode');
+    const btnCarouselMode = document.getElementById('btnCarouselMode');
+
+    function setAppMode(newMode) {
+      state.mode = newMode;
+      const isCarousel = (newMode === 'carousel');
+
+      btnCropMode.className = !isCarousel
+        ? 'flex items-center gap-1.5 px-3.5 py-1 rounded-full font-medium transition-all bg-zinc-800 text-white shadow-sm'
+        : 'flex items-center gap-1.5 px-3.5 py-1 rounded-full font-medium transition-all text-zinc-400 hover:text-zinc-200';
+
+      btnCarouselMode.className = isCarousel
+        ? 'flex items-center gap-1.5 px-3.5 py-1 rounded-full font-medium transition-all bg-zinc-800 text-white shadow-sm'
+        : 'flex items-center gap-1.5 px-3.5 py-1 rounded-full font-medium transition-all text-zinc-400 hover:text-zinc-200';
+
+      quickCropDock.classList.toggle('hidden', isCarousel);
+      quickCarouselDock.classList.toggle('hidden', !isCarousel);
+      carouselControlCard.classList.toggle('hidden', !isCarousel);
+      carouselSlidePill.classList.toggle('hidden', !isCarousel);
+      carouselIndividualDownloads.classList.toggle('hidden', !isCarousel);
+
+      if (isCarousel) {
+        updateCarouselDimensions();
+        headerExportText.innerText = `Export ${state.carouselSlices} Slides`;
+        sidebarExportText.innerText = `Download All ${state.carouselSlices} Slides (.ZIP)`;
+        rebuildSliceDownloadChips();
+      } else {
+        headerExportText.innerText = 'Export';
+        sidebarExportText.innerText = 'Download Ready Photo';
+        setSingleAspectRatio(state.ratioKey);
+      }
+
+      updateOverlays();
+      render();
+      fitCanvasToViewport();
+    }
+
+    btnCropMode.addEventListener('click', () => setAppMode('crop'));
+    btnCarouselMode.addEventListener('click', () => setAppMode('carousel'));
+
+    // Carousel Dimensions Logic
+    function updateCarouselDimensions() {
+      const singleH = (state.carouselRatio === '4:5') ? 1350 : 1080;
+      const singleW = 1080;
+      state.targetH = singleH;
+      state.targetW = singleW * state.carouselSlices;
+
+      canvasDimLabel.innerText = `${state.targetW} × ${state.targetH} px`;
+      ratioTagLabel.innerText = `${state.carouselSlices} Slices (${state.carouselRatio === '4:5' ? '4:5 Portrait' : '1:1 Square'})`;
+      carouselSlidePill.innerText = `${state.carouselSlices} Slices`;
+      document.getElementById('cardSliceCount').innerText = `${state.carouselSlices} Slides`;
+    }
+
+    // Carousel Slices Selector
+    const inputSliceCount = document.getElementById('inputSliceCount');
+    const labelSlideCount = document.getElementById('labelSlideCount');
+
+    function setSliceCount(count) {
+      state.carouselSlices = parseInt(count);
+      inputSliceCount.value = count;
+      labelSlideCount.innerText = count;
+
+      document.querySelectorAll('.slice-btn').forEach(b => {
+        const active = parseInt(b.dataset.slices) === state.carouselSlices;
+        b.className = active
+          ? 'slice-btn active px-2.5 py-1 rounded text-xs font-semibold bg-zinc-800 text-white shadow-sm transition'
+          : 'slice-btn px-2.5 py-1 rounded text-xs text-zinc-400 hover:text-white transition';
+      });
+
+      headerExportText.innerText = `Export ${count} Slides`;
+      sidebarExportText.innerText = `Download All ${count} Slides (.ZIP)`;
+
+      updateCarouselDimensions();
+      updateOverlays();
+      rebuildSliceDownloadChips();
+      render();
+      fitCanvasToViewport();
+    }
+
+    inputSliceCount.addEventListener('input', (e) => setSliceCount(e.target.value));
+
+    document.querySelectorAll('.slice-btn').forEach(btn => {
+      btn.addEventListener('click', () => setSliceCount(btn.dataset.slices));
+    });
+
+    const btnSliceRatioPortrait = document.getElementById('btnSliceRatioPortrait');
+    const btnSliceRatioSquare = document.getElementById('btnSliceRatioSquare');
+
+    btnSliceRatioPortrait.addEventListener('click', () => {
+      state.carouselRatio = '4:5';
+      btnSliceRatioPortrait.className = 'py-1.5 px-2 rounded-lg text-xs font-medium border border-zinc-600 bg-zinc-800 text-white transition';
+      btnSliceRatioSquare.className = 'py-1.5 px-2 rounded-lg text-xs font-medium border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white transition';
+      updateCarouselDimensions();
+      updateOverlays();
+      render();
+      fitCanvasToViewport();
+    });
+
+    btnSliceRatioSquare.addEventListener('click', () => {
+      state.carouselRatio = '1:1';
+      btnSliceRatioSquare.className = 'py-1.5 px-2 rounded-lg text-xs font-medium border border-zinc-600 bg-zinc-800 text-white transition';
+      btnSliceRatioPortrait.className = 'py-1.5 px-2 rounded-lg text-xs font-medium border border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white transition';
+      updateCarouselDimensions();
+      updateOverlays();
+      render();
+      fitCanvasToViewport();
+    });
+
+    // Extended Aspect Ratio Controller
+    document.querySelectorAll('.ratio-pill').forEach(btn => {
+      btn.addEventListener('click', () => setSingleAspectRatio(btn.dataset.ratio));
+    });
+
+    function setSingleAspectRatio(ratio) {
+      state.ratioKey = ratio;
+      state.isCircle = (ratio === 'circle');
+
+      document.querySelectorAll('.ratio-pill').forEach(b => {
+        const active = (b.dataset.ratio === ratio);
+        b.className = active
+          ? 'ratio-pill active px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-100 text-zinc-950 border-zinc-200'
+          : 'ratio-pill px-3 py-1.5 rounded-lg border text-xs font-medium flex items-center gap-1.5 shrink-0 transition-all bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800';
+      });
+
+      switch (ratio) {
+        case '4:5':
+          state.targetW = 1080;
+          state.targetH = 1350;
+          ratioTagLabel.innerText = 'Portrait (4:5)';
+          break;
+        case '1:1':
+          state.targetW = 1080;
+          state.targetH = 1080;
+          ratioTagLabel.innerText = 'Square (1:1)';
+          break;
+        case '9:16':
+          state.targetW = 1080;
+          state.targetH = 1920;
+          ratioTagLabel.innerText = 'Story / Reel (9:16)';
+          break;
+        case '1.91:1':
+          state.targetW = 1080;
+          state.targetH = 566;
+          ratioTagLabel.innerText = 'Landscape (1.91:1)';
+          break;
+        case '16:9':
+          state.targetW = 1920;
+          state.targetH = 1080;
+          ratioTagLabel.innerText = 'Wide Landscape (16:9)';
+          break;
+        case '4:3':
+          state.targetW = 1440;
+          state.targetH = 1080;
+          ratioTagLabel.innerText = 'Classic Photo (4:3)';
+          break;
+        case '2:3':
+          state.targetW = 1080;
+          state.targetH = 1620;
+          ratioTagLabel.innerText = '35mm Vertical (2:3)';
+          break;
+        case 'circle':
+          state.targetW = 1080;
+          state.targetH = 1080;
+          ratioTagLabel.innerText = 'Avatar Circle';
+          break;
+      }
+
+      canvasDimLabel.innerText = `${state.targetW} × ${state.targetH} px`;
+      updateOverlays();
+      render();
+      fitCanvasToViewport();
+    }
+
+    // Grid and Slice Overlays
+    function updateOverlays() {
+      canvasOverlay.innerHTML = '';
+      if (!state.showGuides) {
+        canvasOverlay.className = 'pointer-events-none absolute inset-0';
+        return;
+      }
+
+      if (state.mode === 'crop' && state.isCircle) {
+        canvasOverlay.className = 'pointer-events-none absolute inset-0 rounded-full border border-sky-400 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)]';
+      } else if (state.mode === 'carousel') {
+        canvasOverlay.className = 'pointer-events-none absolute inset-0 border border-zinc-600/80';
+        const fraction = 100 / state.carouselSlices;
+
+        for (let i = 1; i < state.carouselSlices; i++) {
+          const cut = document.createElement('div');
+          cut.className = 'absolute top-0 bottom-0 w-px bg-zinc-300 border-r border-dashed border-zinc-400 shadow-sm';
+          cut.style.left = `${fraction * i}%`;
+          canvasOverlay.appendChild(cut);
+        }
+
+        for (let i = 0; i < state.carouselSlices; i++) {
+          const label = document.createElement('div');
+          label.className = 'absolute top-2 text-[10px] font-mono text-zinc-200 bg-black/70 backdrop-blur px-2 py-0.5 rounded border border-white/20';
+          label.style.left = `${(fraction * i) + (fraction / 2)}%`;
+          label.style.transform = 'translateX(-50%)';
+          label.innerText = `Slide ${i + 1}`;
+          canvasOverlay.appendChild(label);
+        }
+      } else {
+        canvasOverlay.className = 'pointer-events-none absolute inset-0 border border-zinc-700/60';
+        // Rule of Thirds
+        const h1 = document.createElement('div');
+        h1.className = 'absolute top-1/3 left-0 right-0 h-px bg-white/10';
+        const h2 = document.createElement('div');
+        h2.className = 'absolute top-2/3 left-0 right-0 h-px bg-white/10';
+        const v1 = document.createElement('div');
+        v1.className = 'absolute left-1/3 top-0 bottom-0 w-px bg-white/10';
+        const v2 = document.createElement('div');
+        v2.className = 'absolute left-2/3 top-0 bottom-0 w-px bg-white/10';
+        canvasOverlay.append(h1, h2, v1, v2);
+      }
+    }
+
+    // Framing Strategy (Fill vs Fit)
+    const btnFitModeFill = document.getElementById('btnFitModeFill');
+    const btnFitModeFit = document.getElementById('btnFitModeFit');
+
+    btnFitModeFill.addEventListener('click', () => {
+      state.fitMode = 'fill';
+      btnFitModeFill.className = 'py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition bg-zinc-100 text-zinc-900 border-zinc-200 font-semibold shadow-sm';
+      btnFitModeFit.className = 'py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800';
+      fitBackgroundOptions.classList.add('hidden');
+      render();
+    });
+
+    btnFitModeFit.addEventListener('click', () => {
+      state.fitMode = 'fit';
+      btnFitModeFit.className = 'py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition bg-zinc-100 text-zinc-900 border-zinc-200 font-semibold shadow-sm';
+      btnFitModeFill.className = 'py-2 px-3 rounded-lg border text-xs font-medium flex items-center justify-center gap-1.5 transition bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border-zinc-800';
+      fitBackgroundOptions.classList.remove('hidden');
+      render();
+    });
+
+    // Borders & Framing (Passe-partout / Polaroid)
+    const borderWidthRow = document.getElementById('borderWidthRow');
+    const borderColorRow = document.getElementById('borderColorRow');
+
+    document.querySelectorAll('.border-style-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.border-style-pill').forEach(b => {
+          b.className = 'border-style-pill py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-900 text-zinc-400 border-zinc-800';
+        });
+        btn.className = 'border-style-pill active py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-800 text-white border-zinc-600';
+        state.borderStyle = btn.dataset.border;
+
+        const hasBorder = state.borderStyle !== 'none';
+        borderWidthRow.classList.toggle('hidden', !hasBorder);
+        borderColorRow.classList.toggle('hidden', !hasBorder);
+        render();
+      });
+    });
+
+    document.getElementById('inputBorderWidth').addEventListener('input', (e) => {
+      state.borderWidth = parseInt(e.target.value);
+      document.getElementById('labelBorderWidth').innerText = `${state.borderWidth}px`;
+      render();
+    });
+
+    document.querySelectorAll('[data-bcolor]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.borderColor = btn.dataset.bcolor;
+        render();
+      });
+    });
+
+    document.getElementById('inputCustomBorderColor').addEventListener('input', (e) => {
+      state.borderColor = e.target.value;
+      render();
+    });
+
+    // Background Styling (for Fit mode)
+    const solidColorPickerRow = document.getElementById('solidColorPickerRow');
+    const gradientPickerRow = document.getElementById('gradientPickerRow');
+    const blurSliderRow = document.getElementById('blurSliderRow');
+
+    document.querySelectorAll('.bg-style-pill').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.bg-style-pill').forEach(b => {
+          b.className = 'bg-style-pill py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-900 text-zinc-400 border-zinc-800';
+        });
+        btn.className = 'bg-style-pill active py-1.5 rounded-lg border text-xs font-medium text-center transition bg-zinc-800 text-white border-zinc-600';
+
+        state.bgStyle = btn.dataset.bg;
+        solidColorPickerRow.classList.toggle('hidden', state.bgStyle !== 'solid');
+        gradientPickerRow.classList.toggle('hidden', state.bgStyle !== 'gradient');
+        blurSliderRow.classList.toggle('hidden', state.bgStyle !== 'blur');
+        render();
+      });
+    });
+
+    document.querySelectorAll('[data-c]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.solidColor = btn.dataset.c;
+        render();
+      });
+    });
+
+    document.getElementById('inputCustomColor').addEventListener('input', (e) => {
+      state.solidColor = e.target.value;
+      render();
+    });
+
+    document.querySelectorAll('[data-g]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.gradientName = btn.dataset.g;
+        render();
+      });
+    });
+
+    document.getElementById('inputPadding').addEventListener('input', (e) => {
+      state.paddingPercent = parseInt(e.target.value);
+      document.getElementById('labelPadding').innerText = `${state.paddingPercent}%`;
+      render();
+    });
+
+    document.getElementById('inputBlurRadius').addEventListener('input', (e) => {
+      state.bgBlur = parseInt(e.target.value);
+      document.getElementById('labelBlur').innerText = `${state.bgBlur}px`;
+      render();
+    });
+
+    // Scale, Rotate & Flips
+    document.getElementById('inputScale').addEventListener('input', (e) => {
+      state.scaleMultiplier = parseInt(e.target.value) / 100;
+      document.getElementById('labelScale').innerText = `${e.target.value}%`;
+      render();
+    });
+
+    document.getElementById('btnRotateCanvas').addEventListener('click', () => {
+      state.rotation = (state.rotation + 90) % 360;
+      render();
+    });
+
+    document.getElementById('btnFlipH').addEventListener('click', () => {
+      state.flipH = !state.flipH;
+      render();
+    });
+
+    document.getElementById('btnFlipV').addEventListener('click', () => {
+      state.flipV = !state.flipV;
+      render();
+    });
+
+    // Sidebar Tab Navigation
+    document.querySelectorAll('.panel-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.panel-tab').forEach(t => {
+          t.className = 'panel-tab flex-1 py-3 font-medium text-zinc-400 hover:text-zinc-200 border-b-2 border-transparent transition flex justify-center items-center gap-1';
+        });
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+        tab.className = 'panel-tab active flex-1 py-3 font-medium text-white border-b-2 border-white transition flex justify-center items-center gap-1';
+        document.getElementById(tab.dataset.tab).classList.remove('hidden');
+      });
+    });
+
+    // Fine-Tuning Adjustments
+    const tuneControls = [
+      { id: 'adjBrightness', key: 'brightness', unit: '%', textId: 'valBrightness' },
+      { id: 'adjContrast', key: 'contrast', unit: '%', textId: 'valContrast' },
+      { id: 'adjSaturation', key: 'saturation', unit: '%', textId: 'valSaturation' },
+      { id: 'adjWarmth', key: 'warmth', unit: '%', textId: 'valWarmth' },
+      { id: 'adjTint', key: 'tint', unit: '%', textId: 'valTint' },
+      { id: 'adjHighlights', key: 'highlights', unit: '%', textId: 'valHighlights' },
+      { id: 'adjShadows', key: 'shadows', unit: '%', textId: 'valShadows' },
+      { id: 'adjSharpness', key: 'sharpness', unit: '%', textId: 'valSharpness' },
+      { id: 'adjGrain', key: 'grain', unit: '%', textId: 'valGrain' },
+      { id: 'adjVignette', key: 'vignette', unit: '%', textId: 'valVignette' },
+      { id: 'adjSoftBlur', key: 'softBlur', unit: 'px', textId: 'valSoftBlur' }
+    ];
+
+    tuneControls.forEach(ctrl => {
+      const el = document.getElementById(ctrl.id);
+      el.addEventListener('input', (e) => {
+        state[ctrl.key] = parseFloat(e.target.value);
+        document.getElementById(ctrl.textId).innerText = `${e.target.value}${ctrl.unit}`;
+        render();
+      });
+    });
+
+    document.getElementById('btnResetAdjust').addEventListener('click', () => {
+      tuneControls.forEach(ctrl => {
+        state[ctrl.key] = 0;
+        const el = document.getElementById(ctrl.id);
+        el.value = 0;
+        document.getElementById(ctrl.textId).innerText = `0${ctrl.unit}`;
+      });
+      render();
+      showToast('Adjustments reset');
+    });
+
+    // Presets Handlers
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => {
+          b.className = 'filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition';
+        });
+        btn.className = 'filter-btn active text-left p-2.5 rounded-lg border border-zinc-500 bg-zinc-800 transition';
+        state.filter = btn.dataset.filter;
+        render();
+      });
+    });
+
+    document.getElementById('btnResetFilters').addEventListener('click', () => {
+      state.filter = 'normal';
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        const isNorm = b.dataset.filter === 'normal';
+        b.className = isNorm
+          ? 'filter-btn active text-left p-2.5 rounded-lg border border-zinc-500 bg-zinc-800 transition'
+          : 'filter-btn text-left p-2.5 rounded-lg border border-zinc-800 hover:border-zinc-700 bg-zinc-900 transition';
+      });
+      render();
+    });
+
+    // Watermark & Handle Overlay Controls
+    const checkEnableWatermark = document.getElementById('checkEnableWatermark');
+    const watermarkControlsContainer = document.getElementById('watermarkControlsContainer');
+    const inputWatermarkText = document.getElementById('inputWatermarkText');
+    const selectWatermarkFont = document.getElementById('selectWatermarkFont');
+    const inputWatermarkSize = document.getElementById('inputWatermarkSize');
+    const inputWatermarkOpacity = document.getElementById('inputWatermarkOpacity');
+    const checkWatermarkBadge = document.getElementById('checkWatermarkBadge');
+
+    checkEnableWatermark.addEventListener('change', (e) => {
+      state.watermarkEnabled = e.target.checked;
+      watermarkControlsContainer.classList.toggle('opacity-40', !state.watermarkEnabled);
+      watermarkControlsContainer.classList.toggle('pointer-events-none', !state.watermarkEnabled);
+      render();
+    });
+
+    inputWatermarkText.addEventListener('input', (e) => {
+      state.watermarkText = e.target.value;
+      render();
+    });
+
+    selectWatermarkFont.addEventListener('change', (e) => {
+      state.watermarkFont = e.target.value;
+      render();
+    });
+
+    document.querySelectorAll('.wpos-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.wpos-btn').forEach(b => {
+          b.className = 'wpos-btn py-1 rounded bg-zinc-800 text-[10px] text-zinc-300 hover:bg-zinc-700 transition';
+        });
+        btn.className = 'wpos-btn active py-1 rounded bg-zinc-100 text-zinc-950 font-bold text-[10px] transition';
+        state.watermarkPosition = btn.dataset.wpos;
+        render();
+      });
+    });
+
+    inputWatermarkSize.addEventListener('input', (e) => {
+      state.watermarkSize = parseInt(e.target.value);
+      document.getElementById('valWatermarkSize').innerText = `${state.watermarkSize}px`;
+      render();
+    });
+
+    inputWatermarkOpacity.addEventListener('input', (e) => {
+      state.watermarkOpacity = parseInt(e.target.value);
+      document.getElementById('valWatermarkOpacity').innerText = `${state.watermarkOpacity}%`;
+      render();
+    });
+
+    checkWatermarkBadge.addEventListener('change', (e) => {
+      state.watermarkBadge = e.target.checked;
+      render();
+    });
+
+    document.querySelectorAll('[data-wcolor]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.watermarkColor = btn.dataset.wcolor;
+        render();
+      });
+    });
+
+    document.getElementById('inputWatermarkCustomColor').addEventListener('input', (e) => {
+      state.watermarkColor = e.target.value;
+      render();
+    });
+
+    // Viewport Drag-to-Pan & Zoom
+    viewportContainer.addEventListener('mousedown', (e) => {
+      if (!state.imageLoaded) return;
+      state.isDragging = true;
+      state.dragStartX = e.clientX - state.panX;
+      state.dragStartY = e.clientY - state.panY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!state.isDragging) return;
+      state.panX = e.clientX - state.dragStartX;
+      state.panY = e.clientY - state.dragStartY;
+      render();
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.isDragging = false;
+    });
+
+    // Touch support for dragging
+    viewportContainer.addEventListener('touchstart', (e) => {
+      if (!state.imageLoaded || e.touches.length !== 1) return;
+      state.isDragging = true;
+      state.dragStartX = e.touches[0].clientX - state.panX;
+      state.dragStartY = e.touches[0].clientY - state.panY;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!state.isDragging || e.touches.length !== 1) return;
+      state.panX = e.touches[0].clientX - state.dragStartX;
+      state.panY = e.touches[0].clientY - state.dragStartY;
+      render();
+    }, { passive: true });
+
+    window.addEventListener('touchend', () => {
+      state.isDragging = false;
+    });
+
+    // Wheel to Zoom
+    viewportContainer.addEventListener('wheel', (e) => {
+      if (!state.imageLoaded) return;
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 1.08 : 0.92;
+      const newScale = Math.min(Math.max(state.scaleMultiplier * delta, 0.3), 3.5);
+      state.scaleMultiplier = newScale;
+      document.getElementById('inputScale').value = Math.round(newScale * 100);
+      document.getElementById('labelScale').innerText = `${Math.round(newScale * 100)}%`;
+      render();
+    }, { passive: false });
+
+    // Viewport Fitting
+    function fitCanvasToViewport() {
+      const rect = viewportContainer.getBoundingClientRect();
+      const padding = 60;
+      const availableW = Math.max(rect.width - padding, 200);
+      const availableH = Math.max(rect.height - padding, 200);
+
+      const scaleX = availableW / state.targetW;
+      const scaleY = availableH / state.targetH;
+      state.viewportZoom = Math.min(scaleX, scaleY, 0.95);
+      applyViewportTransform();
+    }
+
+    function applyViewportTransform() {
+      stageWrapper.style.transform = `scale(${state.viewportZoom})`;
+      zoomPercentText.innerText = `${Math.round(state.viewportZoom * 100)}%`;
+    }
+
+    document.getElementById('btnZoomIn').addEventListener('click', () => {
+      state.viewportZoom = Math.min(state.viewportZoom * 1.15, 2.5);
+      applyViewportTransform();
+    });
+
+    document.getElementById('btnZoomOut').addEventListener('click', () => {
+      state.viewportZoom = Math.max(state.viewportZoom * 0.85, 0.1);
+      applyViewportTransform();
+    });
+
+    document.getElementById('btnResetView').addEventListener('click', () => {
+      state.panX = 0;
+      state.panY = 0;
+      fitCanvasToViewport();
+      render();
+    });
+
+    window.addEventListener('resize', fitCanvasToViewport);
+
+    // Image Upload & Demo Generator
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        loadFile(e.target.files[0]);
+      }
+    });
+
+    emptyDropzone.addEventListener('click', (e) => {
+      if (e.target.id !== 'btnLoadSampleImage') fileInput.click();
+    });
+
+    document.getElementById('btnLoadSampleImage').addEventListener('click', (e) => {
+      e.stopPropagation();
+      loadPanoramaDemo();
+    });
+
+    viewportContainer.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      emptyDropzone.classList.add('border-zinc-400');
+    });
+
+    viewportContainer.addEventListener('dragleave', () => {
+      emptyDropzone.classList.remove('border-zinc-400');
+    });
+
+    viewportContainer.addEventListener('drop', (e) => {
+      e.preventDefault();
+      emptyDropzone.classList.remove('border-zinc-400');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        loadFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    function loadFile(file) {
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select a valid image file', true);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const img = new Image();
+        img.onload = () => handleLoadedImage(img);
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function handleLoadedImage(img) {
+      state.image = img;
+      state.imageLoaded = true;
+      state.panX = 0;
+      state.panY = 0;
+      state.scaleMultiplier = 1.0;
+      document.getElementById('inputScale').value = 100;
+      document.getElementById('labelScale').innerText = '100%';
+      emptyDropzone.classList.add('hidden');
+
+      const aspect = img.width / img.height;
+      if (aspect >= 1.9) {
+        const estimatedSlices = Math.min(Math.max(Math.round(aspect * 1.25), 2), 6);
+        setSliceCount(estimatedSlices);
+        setAppMode('carousel');
+        showToast(`Panorama detected: switched to ${estimatedSlices} seamless slides`);
+      } else {
+        render();
+        fitCanvasToViewport();
+        showToast('Image loaded');
+      }
+    }
+
+    // Scenic High-Resolution Panoramic Demo Canvas
+    function loadPanoramaDemo() {
+      const demoCanvas = document.createElement('canvas');
+      demoCanvas.width = 3240;
+      demoCanvas.height = 1350;
+      const dCtx = demoCanvas.getContext('2d');
+
+      // Atmospheric Sky Gradient
+      const sky = dCtx.createLinearGradient(0, 0, 3240, 1350);
+      sky.addColorStop(0, '#020617');
+      sky.addColorStop(0.3, '#1e1b4b');
+      sky.addColorStop(0.55, '#831843');
+      sky.addColorStop(0.75, '#ea580c');
+      sky.addColorStop(1, '#fde047');
+      dCtx.fillStyle = sky;
+      dCtx.fillRect(0, 0, 3240, 1350);
+
+      // Starfield in slides 1 & 2
+      dCtx.fillStyle = '#ffffff';
+      for (let i = 0; i < 140; i++) {
+        const sx = Math.random() * 2100;
+        const sy = Math.random() * 620;
+        const sr = Math.random() * 2.2 + 0.3;
+        dCtx.beginPath();
+        dCtx.arc(sx, sy, sr, 0, Math.PI * 2);
+        dCtx.fill();
+      }
+
+      // Golden Sun in Slide 3
+      dCtx.beginPath();
+      dCtx.arc(2680, 680, 220, 0, Math.PI * 2);
+      dCtx.fillStyle = '#fffbeb';
+      dCtx.shadowColor = '#f59e0b';
+      dCtx.shadowBlur = 90;
+      dCtx.fill();
+      dCtx.shadowBlur = 0;
+
+      // Majestic Alpine Ridge Across All Slides
+      dCtx.beginPath();
+      dCtx.moveTo(0, 1350);
+      dCtx.lineTo(340, 700);
+      dCtx.lineTo(720, 920);
+      dCtx.lineTo(1280, 440);
+      dCtx.lineTo(1820, 840);
+      dCtx.lineTo(2340, 390);
+      dCtx.lineTo(2790, 860);
+      dCtx.lineTo(3240, 560);
+      dCtx.lineTo(3240, 1350);
+      dCtx.closePath();
+      dCtx.fillStyle = '#09090b';
+      dCtx.fill();
+
+      // Reflective Lake Water
+      const water = dCtx.createLinearGradient(0, 1020, 0, 1350);
+      water.addColorStop(0, 'rgba(9, 9, 11, 0.9)');
+      water.addColorStop(1, 'rgba(234, 88, 12, 0.25)');
+      dCtx.fillStyle = water;
+      dCtx.fillRect(0, 1020, 3240, 330);
+
+      const demoImg = new Image();
+      demoImg.onload = () => handleLoadedImage(demoImg);
+      demoImg.src = demoCanvas.toDataURL('image/jpeg', 0.95);
+    }
+
+    // MAIN RENDER ENGINE
+    function render() {
+      if (!state.imageLoaded || !state.image) return;
+
+      const tw = state.targetW;
+      const th = state.targetH;
+
+      if (mainCanvas.width !== tw || mainCanvas.height !== th) {
+        mainCanvas.width = tw;
+        mainCanvas.height = th;
+        fitCanvasToViewport();
+      }
+
+      ctx.save();
+      ctx.clearRect(0, 0, tw, th);
+
+      // Frame background
+      if (state.fitMode === 'fit') {
+        renderBackground(tw, th);
+      } else {
+        ctx.fillStyle = '#09090b';
+        ctx.fillRect(0, 0, tw, th);
+      }
+
+      // Compute frame boundary when border/frame is active
+      let frameInsetLeft = 0;
+      let frameInsetRight = 0;
+      let frameInsetTop = 0;
+      let frameInsetBottom = 0;
+
+      if (state.borderStyle === 'passepartout') {
+        const bw = state.borderWidth;
+        frameInsetLeft = bw;
+        frameInsetRight = bw;
+        frameInsetTop = bw;
+        frameInsetBottom = bw;
+      } else if (state.borderStyle === 'polaroid') {
+        const bw = state.borderWidth;
+        frameInsetLeft = bw;
+        frameInsetRight = bw;
+        frameInsetTop = bw;
+        frameInsetBottom = bw * 2.8; // extra bottom space for polaroid style
+      }
+
+      const activeDrawW = tw - (frameInsetLeft + frameInsetRight);
+      const activeDrawH = th - (frameInsetTop + frameInsetBottom);
+      const activeCenterX = frameInsetLeft + (activeDrawW / 2);
+      const activeCenterY = frameInsetTop + (activeDrawH / 2);
+
+      // Clip active photo area
+      ctx.save();
+      ctx.beginPath();
+      if (state.mode === 'crop' && state.isCircle) {
+        ctx.arc(tw / 2, th / 2, Math.min(tw, th) / 2, 0, Math.PI * 2);
+      } else {
+        ctx.rect(frameInsetLeft, frameInsetTop, activeDrawW, activeDrawH);
+      }
+      ctx.clip();
+
+      const img = state.image;
+      const is90 = (state.rotation === 90 || state.rotation === 270);
+      const srcW = is90 ? img.height : img.width;
+      const srcH = is90 ? img.width : img.height;
+
+      const padX = (state.paddingPercent / 100) * (activeDrawW / 2);
+      const padY = (state.paddingPercent / 100) * (activeDrawH / 2);
+      const boundW = activeDrawW - (padX * 2);
+      const boundH = activeDrawH - (padY * 2);
+
+      let baseScale = (state.fitMode === 'fill')
+        ? Math.max(boundW / srcW, boundH / srcH)
+        : Math.min(boundW / srcW, boundH / srcH);
+
+      const finalScale = baseScale * state.scaleMultiplier;
+      const drawW = img.width * finalScale;
+      const drawH = img.height * finalScale;
+
+      ctx.translate(activeCenterX + state.panX, activeCenterY + state.panY);
+      ctx.rotate((state.rotation * Math.PI) / 180);
+      ctx.scale(state.flipH ? -1 : 1, state.flipV ? -1 : 1);
+
+      // Comprehensive CSS filter chain
+      let filterChain = buildCssFilterChain();
+      ctx.filter = filterChain;
+
+      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.restore();
+
+      // Highlights / Shadows Color Balance Passes
+      if (state.highlights !== 0 || state.shadows !== 0 || state.warmth !== 0 || state.tint !== 0) {
+        applyColorBalanceOverlay(activeCenterX, activeCenterY, activeDrawW, activeDrawH);
+      }
+
+      // Simulated Sharpness Convolution / High Pass
+      if (state.sharpness > 0) {
+        applySharpnessGlow(activeCenterX, activeCenterY, activeDrawW, activeDrawH, state.sharpness);
+      }
+
+      // Authentic Film Grain Generation
+      if (state.grain > 0) {
+        applyAuthenticFilmGrain(tw, th, state.grain / 100);
+      }
+
+      // Vignette
+      if (state.vignette > 0) {
+        drawRadialVignette(tw, th, state.vignette / 100);
+      }
+
+      // Outer Frame Border Overlay (Polaroid / Passepartout)
+      if (state.borderStyle !== 'none') {
+        renderOuterFrame(tw, th, frameInsetLeft, frameInsetRight, frameInsetTop, frameInsetBottom);
+      }
+
+      // Creator Watermark / Handle
+      if (state.watermarkEnabled && state.watermarkText.trim()) {
+        renderWatermarkOverlay(tw, th);
+      }
+
+      ctx.restore();
+    }
+
+    // Build Combined CSS Filter String
+    function buildCssFilterChain() {
+      // Base adjustments
+      const brightnessVal = 100 + state.brightness;
+      const contrastVal = 100 + state.contrast;
+      const saturationVal = 100 + state.saturation;
+      
+      let str = `brightness(${brightnessVal}%) contrast(${contrastVal}%) saturate(${saturationVal}%)`;
+
+      if (state.softBlur > 0) {
+        str += ` blur(${state.softBlur}px)`;
+      }
+
+      // Curated Preset Formulas
+      switch (state.filter) {
+        case 'clarendon':
+          str += ' contrast(125%) saturate(125%)';
+          break;
+        case 'lark':
+          str += ' brightness(108%) saturate(110%) contrast(105%)';
+          break;
+        case 'juno':
+          str += ' sepia(20%) saturate(135%) contrast(115%)';
+          break;
+        case 'portra':
+          str += ' sepia(35%) contrast(105%) saturate(110%) brightness(103%)';
+          break;
+        case 'hp5':
+          str += ' grayscale(100%) contrast(140%) brightness(102%)';
+          break;
+        case 'golden':
+          str += ' sepia(40%) saturate(125%) brightness(108%)';
+          break;
+        case 'tealorange':
+          str += ' contrast(118%) saturate(130%) hue-rotate(-15deg)';
+          break;
+        case 'matte':
+          str += ' contrast(90%) brightness(110%) saturate(85%)';
+          break;
+        case 'cyberpunk':
+          str += ' hue-rotate(170deg) saturate(160%) contrast(125%)';
+          break;
+      }
+
+      return str;
+    }
+
+    // Highlights & Shadows Color Balance
+    function applyColorBalanceOverlay(cx, cy, w, h) {
+      ctx.save();
+      // Temperature / Warmth
+      if (state.warmth !== 0) {
+        ctx.fillStyle = state.warmth > 0
+          ? `rgba(245, 158, 11, ${Math.abs(state.warmth) * 0.003})` // Warm amber
+          : `rgba(2, 132, 199, ${Math.abs(state.warmth) * 0.003})`; // Cool azure
+        ctx.globalCompositeOperation = 'color';
+        ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+      }
+
+      // Tint
+      if (state.tint !== 0) {
+        ctx.fillStyle = state.tint > 0
+          ? `rgba(217, 70, 239, ${Math.abs(state.tint) * 0.003})` // Magenta
+          : `rgba(34, 197, 94, ${Math.abs(state.tint) * 0.003})`; // Green
+        ctx.globalCompositeOperation = 'color';
+        ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+      }
+
+      // Highlights recovery overlay
+      if (state.highlights !== 0) {
+        ctx.fillStyle = state.highlights > 0 ? '#ffffff' : '#000000';
+        ctx.globalCompositeOperation = state.highlights > 0 ? 'screen' : 'multiply';
+        ctx.globalAlpha = Math.abs(state.highlights) * 0.0025;
+        ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+      }
+
+      // Shadows lift overlay
+      if (state.shadows !== 0) {
+        ctx.fillStyle = state.shadows > 0 ? '#ffffff' : '#000000';
+        ctx.globalCompositeOperation = state.shadows > 0 ? 'screen' : 'multiply';
+        ctx.globalAlpha = Math.abs(state.shadows) * 0.0025;
+        ctx.fillRect(cx - w / 2, cy - h / 2, w, h);
+      }
+      ctx.restore();
+    }
+
+    // High Pass Sharpness Glow
+    function applySharpnessGlow(cx, cy, w, h, strength) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'overlay';
+      ctx.globalAlpha = (strength / 100) * 0.35;
+      ctx.drawImage(mainCanvas, cx - w / 2, cy - h / 2, w, h);
+      ctx.restore();
+    }
+
+    // Authentic Film Grain Noise Generator
+    let grainPatternCanvas = null;
+    function getGrainPattern() {
+      if (!grainPatternCanvas) {
+        grainPatternCanvas = document.createElement('canvas');
+        grainPatternCanvas.width = 160;
+        grainPatternCanvas.height = 160;
+        const gCtx = grainPatternCanvas.getContext('2d');
+        const imgData = gCtx.createImageData(160, 160);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const noise = Math.random() * 255;
+          data[i] = noise;
+          data[i + 1] = noise;
+          data[i + 2] = noise;
+          data[i + 3] = 45; // base pattern alpha
+        }
+        gCtx.putImageData(imgData, 0, 0);
+      }
+      return grainPatternCanvas;
+    }
+
+    function applyAuthenticFilmGrain(w, h, intensity) {
+      ctx.save();
+      const pattern = ctx.createPattern(getGrainPattern(), 'repeat');
+      ctx.globalCompositeOperation = 'overlay';
+      ctx.globalAlpha = intensity * 0.75;
+      ctx.fillStyle = pattern;
+      ctx.fillRect(0, 0, w, h);
+      ctx.restore();
+    }
+
+    // Outer Frame Renderer (Polaroid / Passepartout)
+    function renderOuterFrame(tw, th, il, ir, it, ib) {
+      ctx.save();
+      ctx.fillStyle = state.borderColor;
+
+      // Top bar
+      ctx.fillRect(0, 0, tw, it);
+      // Bottom bar
+      ctx.fillRect(0, th - ib, tw, ib);
+      // Left bar
+      ctx.fillRect(0, it, il, th - it - ib);
+      // Right bar
+      ctx.fillRect(tw - ir, it, ir, th - it - ib);
+
+      // Subtle shadow around inside bevel
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(il, it, tw - il - ir, th - it - ib);
+      ctx.restore();
+    }
+
+    // Watermark & Handle Renderer
+    function renderWatermarkOverlay(tw, th) {
+      ctx.save();
+      const fontSize = state.watermarkSize;
+      ctx.font = `600 ${fontSize}px ${state.watermarkFont}`;
+      ctx.textBaseline = 'middle';
+
+      const text = state.watermarkText;
+      const textMetrics = ctx.measureText(text);
+      const textW = textMetrics.width;
+      const textH = fontSize * 1.2;
+
+      const padding = 50;
+      let x = tw - padding - textW;
+      let y = th - padding;
+
+      switch (state.watermarkPosition) {
+        case 'top-left':
+          x = padding;
+          y = padding + textH / 2;
+          break;
+        case 'top-center':
+          x = (tw - textW) / 2;
+          y = padding + textH / 2;
+          break;
+        case 'top-right':
+          x = tw - padding - textW;
+          y = padding + textH / 2;
+          break;
+        case 'bottom-left':
+          x = padding;
+          y = th - padding;
+          break;
+        case 'bottom-center':
+          x = (tw - textW) / 2;
+          y = th - padding;
+          break;
+        case 'bottom-right':
+          x = tw - padding - textW;
+          y = th - padding;
+          break;
+      }
+
+      ctx.globalAlpha = state.watermarkOpacity / 100;
+
+      // Pill Badge Background
+      if (state.watermarkBadge) {
+        const padX = fontSize * 0.6;
+        const padY = fontSize * 0.35;
+        const bx = x - padX;
+        const by = y - (textH / 2) - padY;
+        const bw = textW + (padX * 2);
+        const bh = textH + (padY * 2);
+        const radius = bh / 2;
+
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+        ctx.beginPath();
+        ctx.roundRect(bx, by, bw, bh, radius);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = state.watermarkColor;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+      ctx.fillText(text, x, y);
+
+      ctx.restore();
+    }
+
+    // Render Canvas Background in Fit Mode
+    function renderBackground(tw, th) {
+      if (state.bgStyle === 'solid') {
+        ctx.fillStyle = state.solidColor;
+        ctx.fillRect(0, 0, tw, th);
+      } else if (state.bgStyle === 'gradient') {
+        const g = ctx.createLinearGradient(0, 0, tw, th);
+        if (state.gradientName === 'instagram') {
+          g.addColorStop(0, '#f59e0b');
+          g.addColorStop(0.5, '#ec4899');
+          g.addColorStop(1, '#8b5cf6');
+        } else if (state.gradientName === 'ocean') {
+          g.addColorStop(0, '#0284c7');
+          g.addColorStop(1, '#10b981');
+        } else if (state.gradientName === 'twilight') {
+          g.addColorStop(0, '#4338ca');
+          g.addColorStop(1, '#f43f5e');
+        } else {
+          g.addColorStop(0, '#3f3f46');
+          g.addColorStop(1, '#09090b');
+        }
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, tw, th);
+      } else if (state.bgStyle === 'blur' && state.image) {
+        ctx.save();
+        ctx.filter = `blur(${state.bgBlur}px) brightness(75%)`;
+        const img = state.image;
+        const scale = Math.max(tw / img.width, th / img.height) * 1.15;
+        const bw = img.width * scale;
+        const bh = img.height * scale;
+        ctx.drawImage(img, (tw - bw) / 2, (th - bh) / 2, bw, bh);
+        ctx.restore();
+      }
+    }
+
+    // Radial Vignette
+    function drawRadialVignette(w, h, strength) {
+      const radius = Math.sqrt(Math.pow(w / 2, 2) + Math.pow(h / 2, 2));
+      const grad = ctx.createRadialGradient(w / 2, h / 2, radius * 0.45, w / 2, h / 2, radius);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, `rgba(0,0,0,${Math.min(strength, 0.95)})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Rebuild Carousel Direct Download Chips
+    function rebuildSliceDownloadChips() {
+      sliceChipsContainer.innerHTML = '';
+      for (let i = 0; i < state.carouselSlices; i++) {
+        const chip = document.createElement('button');
+        chip.className = 'px-2 py-1 text-[11px] rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition flex items-center gap-1';
+        chip.innerHTML = `<i class="ph ph-download-simple"></i> Slide ${i + 1}`;
+        chip.addEventListener('click', () => exportSingleSlice(i));
+        sliceChipsContainer.appendChild(chip);
+      }
+    }
+
+    // Export Resolution & Format Pickers
+    const btnFormatJpg = document.getElementById('btnFormatJpg');
+    const btnFormatPng = document.getElementById('btnFormatPng');
+    const btnScale1x = document.getElementById('btnScale1x');
+    const btnScale2x = document.getElementById('btnScale2x');
+    const inputQuality = document.getElementById('inputQuality');
+    const labelQuality = document.getElementById('labelQuality');
+
+    btnFormatJpg.addEventListener('click', () => {
+      state.exportMime = 'image/jpeg';
+      btnFormatJpg.className = 'px-2.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 transition';
+      btnFormatPng.className = 'px-2.5 py-0.5 rounded text-xs font-medium text-zinc-400 hover:text-white transition';
+    });
+
+    btnFormatPng.addEventListener('click', () => {
+      state.exportMime = 'image/png';
+      btnFormatPng.className = 'px-2.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 transition';
+      btnFormatJpg.className = 'px-2.5 py-0.5 rounded text-xs font-medium text-zinc-400 hover:text-white transition';
+    });
+
+    btnScale1x.addEventListener('click', () => {
+      state.exportScale = 1;
+      btnScale1x.className = 'px-2.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 transition';
+      btnScale2x.className = 'px-2.5 py-0.5 rounded text-xs font-medium text-zinc-400 hover:text-white transition';
+    });
+
+    btnScale2x.addEventListener('click', () => {
+      state.exportScale = 2;
+      btnScale2x.className = 'px-2.5 py-0.5 rounded text-xs font-medium bg-zinc-100 text-zinc-950 transition';
+      btnScale1x.className = 'px-2.5 py-0.5 rounded text-xs font-medium text-zinc-400 hover:text-white transition';
+    });
+
+    inputQuality.addEventListener('input', (e) => {
+      state.exportQuality = parseInt(e.target.value) / 100;
+      labelQuality.innerText = `${e.target.value}%`;
+    });
+
+    // Master Export Trigger
+    document.getElementById('btnHeaderExport').addEventListener('click', runExport);
+    document.getElementById('btnSidebarExport').addEventListener('click', runExport);
+
+    function runExport() {
+      if (!state.imageLoaded) {
+        showToast('Please load an image first', true);
+        return;
+      }
+      if (state.mode === 'carousel') {
+        exportCarouselZip();
+      } else {
+        exportSingleImage();
+      }
+    }
+
+    function exportSingleImage() {
+      const scale = state.exportScale;
+      const ext = (state.exportMime === 'image/png') ? 'png' : 'jpg';
+      const filename = `instastudio_${state.ratioKey.replace(':', 'x')}_${scale}x_${Date.now()}.${ext}`;
+
+      let outCanvas = mainCanvas;
+      if (scale !== 1) {
+        outCanvas = document.createElement('canvas');
+        outCanvas.width = mainCanvas.width * scale;
+        outCanvas.height = mainCanvas.height * scale;
+        const oCtx = outCanvas.getContext('2d');
+        oCtx.imageSmoothingEnabled = true;
+        oCtx.imageSmoothingQuality = 'high';
+        oCtx.drawImage(mainCanvas, 0, 0, outCanvas.width, outCanvas.height);
+      }
+
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = outCanvas.toDataURL(state.exportMime, state.exportQuality);
+      link.click();
+      showToast(`Exported photo at ${scale}x resolution`);
+    }
+
+    function exportSingleSlice(idx) {
+      if (!state.imageLoaded) return;
+      const scale = state.exportScale;
+      const count = state.carouselSlices;
+      const sliceW = (mainCanvas.width / count) * scale;
+      const sliceH = mainCanvas.height * scale;
+      const ext = (state.exportMime === 'image/png') ? 'png' : 'jpg';
+
+      const sCanvas = document.createElement('canvas');
+      sCanvas.width = sliceW;
+      sCanvas.height = sliceH;
+      const sCtx = sCanvas.getContext('2d');
+      sCtx.imageSmoothingEnabled = true;
+      sCtx.imageSmoothingQuality = 'high';
+
+      sCtx.drawImage(
+        mainCanvas,
+        idx * (mainCanvas.width / count), 0, (mainCanvas.width / count), mainCanvas.height,
+        0, 0, sliceW, sliceH
+      );
+
+      const link = document.createElement('a');
+      link.download = `instagram_slide_${idx + 1}_of_${count}_${scale}x.${ext}`;
+      link.href = sCanvas.toDataURL(state.exportMime, state.exportQuality);
+      link.click();
+      showToast(`Exported Slide ${idx + 1}`);
+    }
+
+    async function exportCarouselZip() {
+      const originalText = sidebarExportText.innerText;
+      sidebarExportText.innerText = 'Compressing ZIP...';
+
+      try {
+        const zip = new JSZip();
+        const scale = state.exportScale;
+        const count = state.carouselSlices;
+        const sliceW = (mainCanvas.width / count) * scale;
+        const sliceH = mainCanvas.height * scale;
+        const ext = (state.exportMime === 'image/png') ? 'png' : 'jpg';
+
+        for (let i = 0; i < count; i++) {
+          const sCanvas = document.createElement('canvas');
+          sCanvas.width = sliceW;
+          sCanvas.height = sliceH;
+          const sCtx = sCanvas.getContext('2d');
+          sCtx.imageSmoothingEnabled = true;
+          sCtx.imageSmoothingQuality = 'high';
+
+          sCtx.drawImage(
+            mainCanvas,
+            i * (mainCanvas.width / count), 0, (mainCanvas.width / count), mainCanvas.height,
+            0, 0, sliceW, sliceH
+          );
+
+          const dataUrl = sCanvas.toDataURL(state.exportMime, state.exportQuality);
+          const base64Data = dataUrl.split(',')[1];
+          zip.file(`slide-${i + 1}.${ext}`, base64Data, { base64: true });
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(zipBlob);
+        link.download = `carousel_${count}_slides_${scale}x_${Date.now()}.zip`;
+        link.click();
+        showToast(`All ${count} slides saved as ZIP (${scale}x)`);
+      } catch (err) {
+        console.error('ZIP generation error:', err);
+        showToast('Export failed', true);
+      } finally {
+        sidebarExportText.innerText = originalText;
+      }
+    }
+
+    // MODAL PHONE SIMULATOR & GRID PREVIEWS
+    const mockupModal = document.getElementById('mockupModal');
+    const btnOpenMockup = document.getElementById('btnOpenMockup');
+    const btnQuickSwipeLaunch = document.getElementById('btnQuickSwipeLaunch');
+    const btnCloseModal = document.getElementById('btnCloseModal');
+    const btnDismissModal = document.getElementById('btnDismissModal');
+
+    const modalTabSwiper = document.getElementById('modalTabSwiper');
+    const modalTabFeed = document.getElementById('modalTabFeed');
+    const modalTabGrid = document.getElementById('modalTabGrid');
+
+    const viewSwiperSim = document.getElementById('viewSwiperSim');
+    const viewFeedSim = document.getElementById('viewFeedSim');
+    const viewGridSim = document.getElementById('viewGridSim');
+
+    const swiperTrack = document.getElementById('swiperTrack');
+    const swiperDots = document.getElementById('swiperDots');
+    const swiperSlideCounter = document.getElementById('swiperSlideCounter');
+    const btnSwiperPrev = document.getElementById('btnSwiperPrev');
+    const btnSwiperNext = document.getElementById('btnSwiperNext');
+
+    const imgFeedPreview = document.getElementById('imgFeedPreview');
+    const imgGridMain = document.getElementById('imgGridMain');
+    const imgGridAvatar = document.getElementById('imgGridAvatar');
+    const iconGridAvatarDefault = document.getElementById('iconGridAvatarDefault');
+
+    function openSimulator(preferredTab = null) {
+      if (!state.imageLoaded) loadPanoramaDemo();
+
+      const fullData = mainCanvas.toDataURL('image/jpeg', 0.92);
+      imgFeedPreview.src = fullData;
+      imgGridMain.src = fullData;
+
+      if (state.isCircle) {
+        imgGridAvatar.src = fullData;
+        imgGridAvatar.classList.remove('hidden');
+        iconGridAvatarDefault.classList.add('hidden');
+      } else {
+        imgGridAvatar.classList.add('hidden');
+        iconGridAvatarDefault.classList.remove('hidden');
+      }
+
+      setupSwiper();
+
+      if (preferredTab) {
+        switchModalTab(preferredTab);
+      } else if (state.mode === 'carousel') {
+        switchModalTab('swiper');
+      } else {
+        switchModalTab('feed');
+      }
+
+      mockupModal.classList.remove('hidden');
+    }
+
+    function switchModalTab(tabKey) {
+      [modalTabSwiper, modalTabFeed, modalTabGrid].forEach(btn => {
+        btn.className = 'px-3 py-1 rounded-md text-zinc-400 hover:text-white font-medium transition';
+      });
+      viewSwiperSim.classList.add('hidden');
+      viewFeedSim.classList.add('hidden');
+      viewGridSim.classList.add('hidden');
+
+      if (tabKey === 'swiper') {
+        modalTabSwiper.className = 'px-3 py-1 rounded-md bg-zinc-700 text-white font-medium transition flex items-center gap-1';
+        viewSwiperSim.classList.remove('hidden');
+      } else if (tabKey === 'grid') {
+        modalTabGrid.className = 'px-3 py-1 rounded-md bg-zinc-700 text-white font-medium transition';
+        viewGridSim.classList.remove('hidden');
+      } else {
+        modalTabFeed.className = 'px-3 py-1 rounded-md bg-zinc-700 text-white font-medium transition';
+        viewFeedSim.classList.remove('hidden');
+      }
+    }
+
+    modalTabSwiper.addEventListener('click', () => switchModalTab('swiper'));
+    modalTabFeed.addEventListener('click', () => switchModalTab('feed'));
+    modalTabGrid.addEventListener('click', () => switchModalTab('grid'));
+
+    btnOpenMockup.addEventListener('click', () => openSimulator());
+    btnQuickSwipeLaunch.addEventListener('click', () => openSimulator('swiper'));
+    btnCloseModal.addEventListener('click', () => mockupModal.classList.add('hidden'));
+    btnDismissModal.addEventListener('click', () => mockupModal.classList.add('hidden'));
+
+    // Setup Swipable Carousel
+    function setupSwiper() {
+      swiperTrack.innerHTML = '';
+      swiperDots.innerHTML = '';
+      state.swiperIndex = 0;
+
+      const slices = (state.mode === 'carousel') ? state.carouselSlices : 1;
+      const sliceW = mainCanvas.width / slices;
+      const sliceH = mainCanvas.height;
+
+      for (let i = 0; i < slices; i++) {
+        const sCanvas = document.createElement('canvas');
+        sCanvas.width = sliceW;
+        sCanvas.height = sliceH;
+        const sCtx = sCanvas.getContext('2d');
+
+        sCtx.drawImage(
+          mainCanvas,
+          i * sliceW, 0, sliceW, sliceH,
+          0, 0, sliceW, sliceH
+        );
+
+        const slideWrap = document.createElement('div');
+        slideWrap.className = 'w-full h-full shrink-0 flex items-center justify-center bg-black';
+
+        const slideImg = document.createElement('img');
+        slideImg.src = sCanvas.toDataURL('image/jpeg', 0.9);
+        slideImg.className = 'w-full h-full object-cover select-none pointer-events-none';
+        slideWrap.appendChild(slideImg);
+        swiperTrack.appendChild(slideWrap);
+
+        const dot = document.createElement('div');
+        dot.className = `w-1.5 h-1.5 rounded-full transition-all cursor-pointer ${i === 0 ? 'bg-white w-2.5' : 'bg-zinc-600'}`;
+        dot.addEventListener('click', () => moveSwiperTo(i));
+        swiperDots.appendChild(dot);
+      }
+
+      updateSwiperState();
+    }
+
+    function moveSwiperTo(idx) {
+      const max = (state.mode === 'carousel') ? state.carouselSlices - 1 : 0;
+      state.swiperIndex = Math.max(0, Math.min(idx, max));
+      updateSwiperState();
+    }
+
+    function updateSwiperState() {
+      swiperTrack.style.transform = `translateX(-${state.swiperIndex * 100}%)`;
+      const slices = (state.mode === 'carousel') ? state.carouselSlices : 1;
+      swiperSlideCounter.innerText = `${state.swiperIndex + 1}/${slices}`;
+
+      btnSwiperPrev.disabled = (state.swiperIndex === 0);
+      btnSwiperNext.disabled = (state.swiperIndex >= slices - 1);
+      btnSwiperPrev.classList.toggle('opacity-30', state.swiperIndex === 0);
+      btnSwiperNext.classList.toggle('opacity-30', state.swiperIndex >= slices - 1);
+
+      const dots = swiperDots.children;
+      for (let i = 0; i < dots.length; i++) {
+        dots[i].className = (i === state.swiperIndex)
+          ? 'w-2.5 h-1.5 rounded-full bg-white transition-all'
+          : 'w-1.5 h-1.5 rounded-full bg-zinc-600 transition-all';
+      }
+    }
+
+    btnSwiperPrev.addEventListener('click', () => moveSwiperTo(state.swiperIndex - 1));
+    btnSwiperNext.addEventListener('click', () => moveSwiperTo(state.swiperIndex + 1));
+
+    let simTouchStartX = 0;
+    swiperTrack.addEventListener('touchstart', (e) => {
+      simTouchStartX = e.touches[0].clientX;
+    }, { passive: true });
+
+    swiperTrack.addEventListener('touchend', (e) => {
+      const endX = e.changedTouches[0].clientX;
+      const diff = simTouchStartX - endX;
+      if (Math.abs(diff) > 35) {
+        if (diff > 0) moveSwiperTo(state.swiperIndex + 1);
+        else moveSwiperTo(state.swiperIndex - 1);
+      }
+    });
+
+    // Boot & Initial Render
+    window.addEventListener('load', () => {
+      updateOverlays();
+      loadPanoramaDemo();
+    });
+  </script>
+</body>
+</html>
